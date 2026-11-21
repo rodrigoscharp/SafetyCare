@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useMemo, useState } from "react";
-import { Move3d } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Maximize2, Minimize2, Move3d, Pause, RotateCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { partLabel, partsFor } from "@/domain/parts";
@@ -10,11 +11,11 @@ import { partVisual, type DamageLike } from "@/domain/part-status";
 import { cn } from "@/lib/utils";
 import { DamageEditor } from "./damage-editor";
 import { ViewerLegend } from "./legend";
-import { proceduralProvider } from "./procedural-provider";
+import { focusCamera, presetCamera, proceduralProvider, type ViewPreset } from "./procedural-provider";
 import { PartList } from "./part-list";
 import { PartTooltip } from "./part-tooltip";
 import type { VehicleViewerProps } from "./types";
-import type { PartRenderState } from "./vehicle-scene";
+import type { CameraRequest, PartRenderState } from "./vehicle-scene";
 
 const VehicleScene = dynamic(() => import("./vehicle-scene"), {
   ssr: false,
@@ -47,6 +48,34 @@ export function VehicleViewer({
   const model = useMemo(() => proceduralProvider.getModel(type), [type]);
   const catalog = useMemo(() => partsFor(type), [type]);
   const bodyColor = /^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_COLOR;
+
+  // calculada só na montagem: a câmera não deve pular enquanto o usuário marca danos
+  const [initialKeys] = useState(() => [...damages.map((d) => d.partKey), ...items.map((i) => i.partKey)]);
+  const cameraPosition = useMemo(() => focusCamera(model, initialKeys), [model, initialKeys]);
+  const [view, setView] = useState<ViewPreset>("danos");
+  const [cameraRequest, setCameraRequest] = useState<CameraRequest | null>(null);
+  const [autoRotate, setAutoRotate] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setExpanded(false);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [expanded]);
+
+  const goTo = (preset: ViewPreset) => {
+    setView(preset);
+    setAutoRotate(false);
+    const affected = [...damages.map((d) => d.partKey), ...items.map((i) => i.partKey)];
+    const position = preset === "danos" ? focusCamera(model, affected) : presetCamera(model, preset);
+    setCameraRequest((cur) => ({ position, nonce: (cur?.nonce ?? 0) + 1 }));
+  };
 
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [pinnedKey, setPinnedKey] = useState<string | null>(null);
@@ -112,12 +141,40 @@ export function VehicleViewer({
       />
     ) : null;
 
+  const hasAffected = damages.length + items.length > 0;
+  const views: { key: ViewPreset; label: string }[] = [
+    ...(hasAffected ? [{ key: "danos" as const, label: "Danos" }] : []),
+    { key: "frente", label: "Frente" },
+    { key: "esquerda", label: "Esquerda" },
+    { key: "traseira", label: "Traseira" },
+    { key: "direita", label: "Direita" },
+    { key: "topo", label: "Topo" },
+  ];
+
   return (
-    <div className={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]", className)}>
-      <div className="from-muted/60 to-background relative h-[380px] overflow-hidden rounded-xl border bg-gradient-to-b sm:h-[460px] lg:h-[540px]">
+    <div
+      className={cn(
+        "grid gap-4",
+        expanded ? "bg-background fixed inset-0 z-50 p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_300px]" : "xl:grid-cols-[minmax(0,1fr)_280px]",
+        className,
+      )}
+      role={expanded ? "dialog" : undefined}
+      aria-modal={expanded || undefined}
+      aria-label={expanded ? "Modelo 3D em tela cheia" : undefined}
+    >
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-3xl border",
+          "bg-[radial-gradient(ellipse_at_50%_35%,var(--card)_0%,var(--accent)_70%,var(--muted)_100%)]",
+          expanded ? "h-[calc(100dvh-1.5rem)] sm:h-[calc(100dvh-2rem)]" : "h-[440px] sm:h-[540px] lg:h-[620px]",
+        )}
+      >
         <VehicleScene
           key={type}
           model={model}
+          cameraPosition={cameraPosition}
+          cameraRequest={cameraRequest}
+          autoRotate={autoRotate}
           color={bodyColor}
           states={states}
           activeKey={activeKey}
@@ -130,6 +187,33 @@ export function VehicleViewer({
             setPinnedKey(null);
           }}
         />
+
+        <div className="absolute top-3 right-3 z-30 flex gap-1.5">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="bg-card/90 shadow-sm backdrop-blur"
+            aria-pressed={autoRotate}
+            aria-label={autoRotate ? "Parar giro automático" : "Girar automaticamente"}
+            title={autoRotate ? "Parar giro" : "Girar"}
+            onClick={() => setAutoRotate((v) => !v)}
+          >
+            {autoRotate ? <Pause className="size-4" /> : <RotateCw className="size-4" />}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            className="bg-card/90 shadow-sm backdrop-blur"
+            aria-label={expanded ? "Sair da tela cheia" : "Tela cheia"}
+            title={expanded ? "Sair da tela cheia (Esc)" : "Tela cheia"}
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+          </Button>
+        </div>
+
         {editingDamage ? (
           <DamageEditor
             label={partLabel(editingDamage.partKey)}
@@ -142,15 +226,43 @@ export function VehicleViewer({
             onClose={() => setEditingKey(null)}
           />
         ) : null}
-        <p className="text-muted-foreground pointer-events-none absolute right-3 bottom-3 flex items-center gap-1.5 text-xs">
-          <Move3d className="size-3.5" /> Arraste para girar · role para zoom
-        </p>
+
+        <div className="absolute inset-x-3 bottom-3 z-30 flex flex-col items-center gap-2">
+          <div
+            role="toolbar"
+            aria-label="Vistas do veículo"
+            className="bg-card/90 flex max-w-full gap-1 overflow-x-auto rounded-2xl border p-1 shadow-lg backdrop-blur"
+          >
+            {views.map((v) => (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => goTo(v.key)}
+                aria-pressed={view === v.key}
+                className={cn(
+                  "rounded-xl px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors sm:text-sm",
+                  view === v.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-muted-foreground pointer-events-none hidden items-center gap-1.5 text-xs sm:flex">
+            <Move3d className="size-3.5" /> Arraste para girar · role para aproximar
+          </p>
+        </div>
       </div>
 
-      <aside className="bg-card flex flex-col gap-3 rounded-xl border p-3 lg:max-h-[540px]">
+      <aside
+        className={cn(
+          "bg-card flex flex-col gap-3 rounded-3xl border p-4",
+          expanded ? "hidden lg:flex lg:h-[calc(100dvh-2rem)]" : "xl:max-h-[620px]",
+        )}
+      >
         <ViewerLegend mode={mode} color={bodyColor} />
         <div className="border-t" />
-        <ScrollArea className="max-h-72 lg:max-h-none lg:min-h-0 lg:flex-1">
+        <ScrollArea className="max-h-72 xl:max-h-none xl:min-h-0 xl:flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
           <PartList
             parts={catalog}
             states={states}

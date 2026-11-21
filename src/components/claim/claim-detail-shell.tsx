@@ -1,26 +1,29 @@
+import type { Role } from "@prisma/client";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, History, MessageSquare } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CLAIM_TYPE_LABEL, VEHICLE_TYPE_LABEL } from "@/domain/labels";
+import { financialSummary } from "@/domain/quote";
+import { latestQuote } from "@/lib/claim-view";
 import { formatBRL, formatDate, formatDateTime } from "@/lib/format";
 import type { ClaimDetail } from "@/server/claims";
 import { Attachments } from "./attachments";
+import { ClaimTracker } from "./claim-tracker";
 import { MessageForm } from "./message-form";
-import { StatusBadge } from "./status-badge";
-import { StatusStepper } from "./status-stepper";
 import { Timeline } from "./timeline";
 
 /** Estrutura comum do detalhe do sinistro para os três perfis. */
 export function ClaimDetailShell({
   claim,
-  userId,
+  user,
   backHref,
   actions,
   children,
 }: {
   claim: ClaimDetail;
-  userId: string;
+  user: { id: string; role: Role };
   backHref: string;
   /** Painel de ações do perfil (coluna lateral) */
   actions?: ReactNode;
@@ -28,52 +31,78 @@ export function ClaimDetailShell({
   children: ReactNode;
 }) {
   const v = claim.policy.vehicle;
+  const quote = latestQuote(claim);
+  const summary = quote ? financialSummary(quote.items, claim.policy.deductible) : null;
+  const messages = claim.events.filter((e) => e.type === "MENSAGEM");
+
   return (
     <div className="grid gap-6">
-      <div>
-        <Link href={backHref} className="text-muted-foreground hover:text-foreground mb-3 inline-flex items-center gap-1 text-sm">
-          <ArrowLeft className="size-3.5" /> Voltar
-        </Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-mono text-2xl font-semibold tracking-tight">{claim.protocol}</h1>
-          <StatusBadge status={claim.status} className="text-sm" />
-        </div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {CLAIM_TYPE_LABEL[claim.type]} · {v.brand} {v.model} {v.year} · {v.plate} · aberto em {formatDate(claim.createdAt)}
-        </p>
-      </div>
+      <Link href={backHref} className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1.5 text-sm font-medium">
+        <ArrowLeft className="size-4" /> Voltar
+      </Link>
 
-      <Card>
-        <CardContent className="pt-6">
-          <StatusStepper status={claim.status} />
-        </CardContent>
-      </Card>
+      <ClaimTracker
+        status={claim.status}
+        viewer={user.role}
+        facts={{
+          protocol: claim.protocol,
+          vehicle: `${v.brand} ${v.model} · ${v.plate}`,
+          workshop: claim.workshop?.name,
+          estimatedDays: quote?.estimatedDays,
+          clientPays: summary && summary.quoteTotal > 0 ? summary.clientPays : null,
+          provisional: summary ? summary.pendingTotal > 0 : false,
+        }}
+      />
+
+      {actions ? <div className="grid gap-4 md:grid-cols-2 [&>*:only-child]:md:col-span-2">{actions}</div> : null}
+
+      <div className="grid min-w-0 gap-6">{children}</div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="grid min-w-0 gap-6">{children}</div>
+        <Card className="min-w-0">
+          <CardContent>
+            <Tabs defaultValue="mensagens">
+              <TabsList>
+                <TabsTrigger value="mensagens"><MessageSquare className="size-4" /> Mensagens ({messages.length})</TabsTrigger>
+                <TabsTrigger value="historico"><History className="size-4" /> Histórico</TabsTrigger>
+              </TabsList>
+              <TabsContent value="mensagens" className="mt-6 grid gap-6">
+                <MessageForm claimId={claim.id} />
+                {messages.length ? (
+                  <Timeline events={messages} currentUserId={user.id} />
+                ) : (
+                  <p className="text-muted-foreground text-sm">Nenhuma mensagem ainda. Fale com segurado, oficina e seguradora por aqui.</p>
+                )}
+              </TabsContent>
+              <TabsContent value="historico" className="mt-6">
+                <Timeline events={claim.events} currentUserId={user.id} />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6">
-          {actions}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Dados do sinistro</CardTitle>
+              <CardTitle className="text-base">Detalhes</CardTitle>
             </CardHeader>
             <CardContent>
-              <dl className="grid gap-2.5 text-sm">
+              <dl className="grid gap-3 text-sm">
+                <Fact k="Tipo" v={CLAIM_TYPE_LABEL[claim.type]} />
                 <Fact k="Segurado" v={claim.client.name} />
-                <Fact k="Veículo" v={`${VEHICLE_TYPE_LABEL[v.type]} · ${v.brand} ${v.model}`} />
+                <Fact k="Veículo" v={`${VEHICLE_TYPE_LABEL[v.type]} · ${v.brand} ${v.model} ${v.year}`} />
                 <Fact k="Apólice" v={`${claim.policy.number} · franquia ${formatBRL(claim.policy.deductible)}`} />
-                <Fact k="Ocorrido em" v={formatDateTime(claim.occurredAt)} />
+                <Fact k="Ocorrido" v={formatDateTime(claim.occurredAt)} />
                 <Fact k="Local" v={claim.location} />
-                <Fact k="Oficina" v={claim.workshop?.name ?? "Ainda não definida"} />
                 <Fact k="Analista" v={claim.adjuster?.name ?? "Ainda não atribuído"} />
+                <Fact k="Aberto em" v={formatDate(claim.createdAt)} />
               </dl>
-              <p className="bg-muted/50 mt-4 rounded-lg p-3 text-sm whitespace-pre-wrap">{claim.description}</p>
+              <p className="bg-muted/60 mt-4 rounded-xl p-3 text-sm whitespace-pre-wrap">{claim.description}</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Anexos ({claim.attachments.length})</CardTitle>
+              <CardTitle className="text-base">Fotos e documentos ({claim.attachments.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <Attachments claimId={claim.id} attachments={claim.attachments} canUpload />
@@ -81,27 +110,15 @@ export function ClaimDetailShell({
           </Card>
         </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Linha do tempo e mensagens</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <Timeline events={claim.events} currentUserId={userId} />
-          <div className="lg:sticky lg:top-20 lg:self-start">
-            <MessageForm claimId={claim.id} />
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
 
 function Fact({ k, v }: { k: string; v: string }) {
   return (
-    <div className="grid grid-cols-[96px_1fr] gap-2">
+    <div className="grid grid-cols-[88px_1fr] gap-2">
       <dt className="text-muted-foreground">{k}</dt>
-      <dd className="min-w-0 break-words">{v}</dd>
+      <dd className="min-w-0 font-medium break-words">{v}</dd>
     </div>
   );
 }

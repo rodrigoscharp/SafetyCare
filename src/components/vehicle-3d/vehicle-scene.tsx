@@ -1,8 +1,8 @@
 "use client";
 
-import { ContactShadows, Environment, Html, Lightformer, OrbitControls, useCursor } from "@react-three/drei";
+import { CameraControls, ContactShadows, Environment, Html, Lightformer, useCursor } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Suspense, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BackSide, CanvasTexture, Color, RepeatWrapping, SRGBColorSpace, type Mesh, type MeshPhysicalMaterial } from "three";
 import type { PartVisual } from "@/domain/part-status";
 import type { Severity } from "@prisma/client";
@@ -11,8 +11,15 @@ import { OUTLINE_NOT_COVERED, SEVERITY_COLOR, VISUAL_COLOR, baseMaterial } from 
 
 export type PartRenderState = { visual: PartVisual; severity?: Severity };
 
+export type Vec3 = [number, number, number];
+export type CameraRequest = { position: Vec3; nonce: number };
+
 export type VehicleSceneProps = {
   model: VehicleModel;
+  cameraPosition: Vec3;
+  /** Pedido de movimento de câmera (vistas prontas); muda o nonce para repetir */
+  cameraRequest: CameraRequest | null;
+  autoRotate: boolean;
   color: string;
   states: Record<string, PartRenderState>;
   activeKey: string | null;
@@ -167,14 +174,14 @@ function PartMesh({
 }
 
 export default function VehicleScene(props: VehicleSceneProps) {
-  const { model, color, states, activeKey, selectedKey, clickable, tooltip, onHover, onPartClick, onMissed } = props;
+  const { model, cameraPosition, cameraRequest, autoRotate, color, states, activeKey, selectedKey, clickable, tooltip, onHover, onPartClick, onMissed } = props;
   const activeSpec = activeKey ? model.parts.find((p) => p.key === activeKey) : undefined;
 
   return (
     <Canvas
       dpr={[1, 2]}
       shadows
-      camera={{ position: model.camera.position, fov: 35, near: 0.1, far: 100 }}
+      camera={{ position: cameraPosition, fov: 35, near: 0.1, far: 100 }}
       onPointerMissed={onMissed}
       gl={{ antialias: true, preserveDrawingBuffer: false }}
       aria-label="Modelo 3D do veículo"
@@ -200,16 +207,7 @@ export default function VehicleScene(props: VehicleSceneProps) {
             {tooltip}
           </Html>
         ) : null}
-        <OrbitControls
-          makeDefault
-          target={model.camera.target}
-          enablePan={false}
-          enableDamping
-          minDistance={model.camera.minDistance}
-          maxDistance={model.camera.maxDistance}
-          minPolarAngle={0.25}
-          maxPolarAngle={Math.PI / 2 - 0.06}
-        />
+        <CameraRig model={model} request={cameraRequest} autoRotate={autoRotate} />
       </Suspense>
     </Canvas>
   );
@@ -224,7 +222,7 @@ function SceneContent({
   clickable,
   onHover,
   onPartClick,
-}: Omit<VehicleSceneProps, "tooltip" | "onMissed">) {
+}: Omit<VehicleSceneProps, "tooltip" | "onMissed" | "cameraPosition" | "cameraRequest" | "autoRotate">) {
   const hatch = useHatchTexture();
   return (
     <>
@@ -258,7 +256,44 @@ function SceneContent({
         ))}
       </group>
 
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.002, 0]} receiveShadow>
+        <circleGeometry args={[model.camera.maxDistance * 0.42, 96]} />
+        <meshStandardMaterial color="#8a93a6" transparent opacity={0.12} roughness={1} />
+      </mesh>
       <ContactShadows position={[0, 0.001, 0]} opacity={0.5} scale={12} blur={2.4} far={2.5} resolution={512} />
     </>
+  );
+}
+
+function CameraRig({ model, request, autoRotate }: { model: VehicleModel; request: CameraRequest | null; autoRotate: boolean }) {
+  const ref = useRef<CameraControls>(null);
+  const [tx, ty, tz] = model.camera.target;
+
+  useEffect(() => {
+    ref.current?.setTarget(tx, ty, tz, false);
+  }, [tx, ty, tz]);
+
+  useEffect(() => {
+    if (!request || !ref.current) return;
+    const [x, y, z] = request.position;
+    void ref.current.setLookAt(x, y, z, tx, ty, tz, true);
+  }, [request, tx, ty, tz]);
+
+  useFrame((_, delta) => {
+    if (autoRotate && ref.current) ref.current.azimuthAngle += delta * 0.35;
+  });
+
+  return (
+    <CameraControls
+      ref={ref}
+      makeDefault
+      minDistance={model.camera.minDistance}
+      maxDistance={model.camera.maxDistance}
+      minPolarAngle={0.02}
+      maxPolarAngle={Math.PI / 2 - 0.06}
+      truckSpeed={0}
+      smoothTime={0.35}
+      dollySpeed={0.6}
+    />
   );
 }

@@ -3,9 +3,9 @@ import { ShieldCheck } from "lucide-react";
 
 export function Logo({ href = "/" }: { href?: string }) {
   return (
-    <Link href={href} className="flex items-center gap-2 font-semibold tracking-tight">
-      <span className="bg-primary text-primary-foreground grid size-7 place-items-center rounded-md">
-        <ShieldCheck className="size-4" />
+    <Link href={href} className="flex items-center gap-2.5 text-[17px] font-bold tracking-tight">
+      <span className="bg-primary text-primary-foreground grid size-8 place-items-center rounded-xl shadow-sm shadow-primary/30">
+        <ShieldCheck className="size-[18px]" />
       </span>
       SafetyCare
     </Link>

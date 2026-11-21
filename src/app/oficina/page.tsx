@@ -62,7 +62,7 @@ export default async function WorkshopQueue({ searchParams }: { searchParams: Pr
         </div>
       ) : null}
       {claims.length ? (
-        <ClaimList claims={claims} basePath="/oficina" />
+        <ClaimList claims={claims} basePath="/oficina" viewer="OFICINA" />
       ) : (
         <EmptyState icon={Wrench} title="Nada por aqui" description="Nenhum sinistro neste filtro." />
       )}

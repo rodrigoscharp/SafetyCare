@@ -28,7 +28,7 @@ export default async function WorkshopClaimPage({ params }: { params: Promise<{ 
   const nextVersion = draftOrLast?.status === "RASCUNHO" ? draftOrLast.version : (draftOrLast?.version ?? 0) + 1;
 
   return (
-    <ClaimDetailShell claim={claim} userId={user.id} backHref="/oficina" actions={<WorkshopPanel claimId={claim.id} status={claim.status} />}>
+    <ClaimDetailShell claim={claim} user={user} backHref="/oficina" actions={<WorkshopPanel claimId={claim.id} status={claim.status} />}>
       {editable ? (
         <QuoteEditor
           key={draftOrLast?.id ?? "new"}
@@ -59,7 +59,7 @@ export default async function WorkshopClaimPage({ params }: { params: Promise<{ 
                 <CardTitle className="text-base">Orçamento v{sent.version} · {QUOTE_STATUS_LABEL[sent.status]}</CardTitle>
                 <CardDescription>Prazo estimado: {sent.estimatedDays} dia(s).</CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <CardContent className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
                 <QuoteTable items={sent.items} />
                 <FinancialSummaryView
                   summary={financialSummary(sent.items, claim.policy.deductible)}

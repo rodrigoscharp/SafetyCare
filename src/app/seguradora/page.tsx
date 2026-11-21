@@ -46,10 +46,10 @@ export default async function InsurerDashboard({ searchParams }: { searchParams:
             <Link
               key={g.key}
               href={`/seguradora?grupo=${g.key}`}
-              className={cn("bg-card hover:border-primary/50 rounded-xl border p-4 transition-colors", active && "border-primary ring-primary/20 ring-2")}
+              className={cn("bg-card hover:border-primary/50 rounded-2xl border p-5 shadow-sm shadow-black/[0.03] transition-colors", active && "border-primary ring-primary/20 ring-2")}
             >
               <p className="text-muted-foreground text-xs">{g.label}</p>
-              <p className="mt-1 text-3xl font-semibold tabular-nums">{n}</p>
+              <p className="mt-1 text-4xl font-bold tabular-nums">{n}</p>
               <p className="text-muted-foreground mt-1 text-xs">{g.hint}</p>
             </Link>
           );
@@ -65,7 +65,7 @@ export default async function InsurerDashboard({ searchParams }: { searchParams:
 
       <h2 className="mb-3 text-sm font-medium">{title}</h2>
       {claims.length ? (
-        <ClaimList claims={claims} basePath="/seguradora" />
+        <ClaimList claims={claims} basePath="/seguradora" viewer="SEGURADORA" />
       ) : (
         <EmptyState icon={Inbox} title="Fila vazia" description="Nenhum sinistro neste filtro." />
       )}

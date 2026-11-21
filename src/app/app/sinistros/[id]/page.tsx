@@ -22,7 +22,7 @@ export default async function ClientClaimPage({ params }: { params: Promise<{ id
   return (
     <ClaimDetailShell
       claim={claim}
-      userId={user.id}
+      user={user}
       backHref="/app"
       actions={claim.status === "PRONTO_PARA_RETIRADA" ? <ConfirmPickup claimId={claim.id} workshop={claim.workshop?.name ?? "oficina"} /> : null}
     >
@@ -45,11 +45,11 @@ export default async function ClientClaimPage({ params }: { params: Promise<{ id
               Orçamento da {claim.workshop?.name ?? "oficina"} · prazo estimado de {quote.estimatedDays} dia(s).
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="order-2 min-w-0 xl:order-1">
+          <CardContent className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="order-2 min-w-0 2xl:order-1">
               <QuoteTable items={quote.items} />
             </div>
-            <div className="order-1 min-w-0 xl:order-2">
+            <div className="order-1 min-w-0 2xl:order-2">
               <FinancialSummaryView
                 summary={financialSummary(quote.items, claim.policy.deductible)}
                 audience="client"

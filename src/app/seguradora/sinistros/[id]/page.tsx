@@ -27,7 +27,7 @@ export default async function InsurerClaimPage({ params }: { params: Promise<{ i
   return (
     <ClaimDetailShell
       claim={claim}
-      userId={user.id}
+      user={user}
       backHref="/seguradora"
       actions={<TriagePanel claimId={claim.id} status={claim.status} type={claim.type} workshops={workshops} />}
     >
@@ -60,7 +60,7 @@ export default async function InsurerClaimPage({ params }: { params: Promise<{ i
                 <CardTitle className="text-base">Orçamento v{quote.version} · {QUOTE_STATUS_LABEL[quote.status]}</CardTitle>
                 <CardDescription>{claim.workshop?.name} · prazo estimado de {quote.estimatedDays} dia(s).</CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <CardContent className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
                 <QuoteTable items={quote.items} />
                 <FinancialSummaryView
                   summary={financialSummary(quote.items, claim.policy.deductible)}

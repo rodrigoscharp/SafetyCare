@@ -29,6 +29,12 @@ export const claimListInclude = {
   policy: { include: { vehicle: true } },
   client: { select: { name: true } },
   workshop: { select: { name: true } },
+  quotes: {
+    where: { status: { not: "RASCUNHO" } },
+    orderBy: { version: "desc" },
+    take: 1,
+    include: { items: { select: { partPrice: true, laborPrice: true, coverage: true } } },
+  },
 } satisfies Prisma.ClaimInclude;
 
 export type ClaimListItem = Prisma.ClaimGetPayload<{ include: typeof claimListInclude }>;

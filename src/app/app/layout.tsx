@@ -8,9 +8,9 @@ export default async function ClientLayout({ children }: { children: ReactNode }
     <AppShell
       user={user}
       nav={[
-        { href: "/app", label: "Meus sinistros", exact: true },
-        { href: "/app/sinistros/novo", label: "Abrir sinistro" },
-        { href: "/app/veiculos", label: "Veículos" },
+        { href: "/app", label: "Início", icon: "home", exact: true },
+        { href: "/app/sinistros/novo", label: "Abrir sinistro", icon: "plus", highlight: true },
+        { href: "/app/veiculos", label: "Veículos", icon: "car" },
       ]}
     >
       {children}

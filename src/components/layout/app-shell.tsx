@@ -4,46 +4,71 @@ import { LogOut } from "lucide-react";
 import { logoutAction } from "@/actions/auth";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ROLE_HOME, ROLE_LABEL } from "@/domain/roles";
-import { NavLinks, type NavItem } from "./nav-links";
+import { BottomNav, SidebarNav, type NavItem } from "./nav-links";
 
-export function AppShell({
-  user,
-  nav,
-  children,
-}: {
-  user: { name: string; role: Role };
-  nav: NavItem[];
-  children: ReactNode;
-}) {
+function initials(name: string) {
+  return name
+    .replace(/\(.*?\)/g, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+}
+
+function UserBadge({ name, role }: { name: string; role: Role }) {
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="bg-background/85 sticky top-0 z-40 border-b backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
+    <div className="flex min-w-0 items-center gap-3">
+      <span className="bg-accent text-accent-foreground grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold">{initials(name)}</span>
+      <div className="min-w-0">
+        <p className="truncate text-sm leading-tight font-medium">{name}</p>
+        <p className="text-muted-foreground text-xs">{ROLE_LABEL[role]}</p>
+      </div>
+    </div>
+  );
+}
+
+function LogoutButton() {
+  return (
+    <form action={logoutAction}>
+      <Button variant="ghost" size="icon" type="submit" aria-label="Sair">
+        <LogOut className="size-4" />
+      </Button>
+    </form>
+  );
+}
+
+export function AppShell({ user, nav, children }: { user: { name: string; role: Role }; nav: NavItem[]; children: ReactNode }) {
+  return (
+    <div className="min-h-dvh lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
+      <aside className="bg-sidebar sticky top-0 hidden h-dvh flex-col border-r p-4 lg:flex">
+        <div className="px-2 py-2">
           <Logo href={ROLE_HOME[user.role]} />
-          <div className="hidden flex-1 md:block">
-            <NavLinks items={nav} />
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm leading-tight font-medium">{user.name}</p>
-            </div>
-            <Badge variant="secondary">{ROLE_LABEL[user.role]}</Badge>
+        </div>
+        <div className="mt-6 flex-1">
+          <SidebarNav items={nav} />
+        </div>
+        <div className="flex items-center justify-between gap-2 rounded-2xl border p-2.5">
+          <UserBadge name={user.name} role={user.role} />
+          <div className="flex shrink-0">
             <ThemeToggle />
-            <form action={logoutAction}>
-              <Button variant="ghost" size="icon" type="submit" aria-label="Sair">
-                <LogOut className="size-4" />
-              </Button>
-            </form>
+            <LogoutButton />
           </div>
         </div>
-        <div className="border-t px-2 py-1.5 md:hidden">
-          <NavLinks items={nav} />
+      </aside>
+
+      <header className="bg-background/85 sticky top-0 z-30 flex h-14 items-center justify-between border-b px-4 backdrop-blur-lg lg:hidden">
+        <Logo href={ROLE_HOME[user.role]} />
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <LogoutButton />
         </div>
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:py-8">{children}</main>
+
+      <main className={`mx-auto w-full max-w-6xl px-4 pt-6 ${nav.length > 1 ? "pb-28" : "pb-10"} sm:px-6 lg:px-10 lg:pt-10 lg:pb-12`}>{children}</main>
+      <BottomNav items={nav} />
     </div>
   );
 }
