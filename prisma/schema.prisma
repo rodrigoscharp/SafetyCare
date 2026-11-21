@@ -6,3 +6,253 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  CLIENTE
+  OFICINA
+  SEGURADORA
+}
+
+enum VehicleType {
+  CARRO
+  MOTO
+}
+
+enum ClaimType {
+  COLISAO
+  FURTO
+  ROUBO
+  INCENDIO
+  ALAGAMENTO
+  VIDROS
+  OUTRO
+}
+
+enum ClaimStatus {
+  ABERTO
+  EM_ANALISE
+  NEGADO
+  ENCAMINHADO_OFICINA
+  INDENIZACAO_INTEGRAL
+  AGUARDANDO_ORCAMENTO
+  ORCAMENTO_ENVIADO
+  AJUSTE_SOLICITADO
+  ORCAMENTO_APROVADO
+  EM_REPARO
+  PRONTO_PARA_RETIRADA
+  CONCLUIDO
+}
+
+enum Severity {
+  LEVE
+  MEDIO
+  GRAVE
+}
+
+enum DamageSource {
+  CLIENTE
+  OFICINA
+}
+
+enum QuoteStatus {
+  RASCUNHO
+  ENVIADO
+  APROVADO
+  AJUSTE_SOLICITADO
+  RECUSADO
+}
+
+enum RepairAction {
+  TROCAR
+  REPARAR
+  PINTAR
+}
+
+enum Coverage {
+  PENDENTE
+  COBERTO
+  NAO_COBERTO
+}
+
+enum ClaimEventType {
+  CRIACAO
+  STATUS
+  MENSAGEM
+  ORCAMENTO
+  COBERTURA
+  ANEXO
+}
+
+enum AttachmentKind {
+  FOTO
+  DOCUMENTO
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  vehicles          Vehicle[]
+  claimsAsClient    Claim[]      @relation("ClaimClient")
+  claimsAsWorkshop  Claim[]      @relation("ClaimWorkshop")
+  claimsAsAdjuster  Claim[]      @relation("ClaimAdjuster")
+  quotes            Quote[]
+  events            ClaimEvent[]
+  attachments       Attachment[]
+}
+
+model Vehicle {
+  id        String      @id @default(cuid())
+  ownerId   String
+  type      VehicleType
+  brand     String
+  model     String
+  year      Int
+  plate     String      @unique
+  color     String
+  createdAt DateTime    @default(now())
+
+  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  policies Policy[]
+
+  @@index([ownerId])
+}
+
+model Policy {
+  id         String   @id @default(cuid())
+  vehicleId  String
+  number     String   @unique
+  /// Franquia em centavos
+  deductible Int
+  validUntil DateTime
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  claims  Claim[]
+
+  @@index([vehicleId])
+}
+
+/// Contador de protocolo por ano (SC-AAAA-NNNNNN)
+model ProtocolSequence {
+  year Int @id
+  last Int @default(0)
+}
+
+model Claim {
+  id          String      @id @default(cuid())
+  protocol    String      @unique
+  policyId    String
+  clientId    String
+  workshopId  String?
+  adjusterId  String?
+  type        ClaimType
+  description String
+  occurredAt  DateTime
+  location    String
+  status      ClaimStatus @default(ABERTO)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  policy      Policy        @relation(fields: [policyId], references: [id])
+  client      User          @relation("ClaimClient", fields: [clientId], references: [id])
+  workshop    User?         @relation("ClaimWorkshop", fields: [workshopId], references: [id])
+  adjuster    User?         @relation("ClaimAdjuster", fields: [adjusterId], references: [id])
+  damages     ClaimDamage[]
+  quotes      Quote[]
+  events      ClaimEvent[]
+  attachments Attachment[]
+
+  @@index([clientId])
+  @@index([workshopId])
+  @@index([status])
+}
+
+model ClaimDamage {
+  id       String       @id @default(cuid())
+  claimId  String
+  partKey  String
+  severity Severity
+  note     String?
+  source   DamageSource
+
+  claim Claim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@unique([claimId, partKey, source])
+  @@index([claimId])
+}
+
+model Quote {
+  id            String      @id @default(cuid())
+  claimId       String
+  workshopId    String
+  version       Int
+  status        QuoteStatus @default(RASCUNHO)
+  /// Centavos
+  laborTotal    Int         @default(0)
+  /// Centavos
+  partsTotal    Int         @default(0)
+  estimatedDays Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  claim    Claim       @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  workshop User        @relation(fields: [workshopId], references: [id])
+  items    QuoteItem[]
+
+  @@unique([claimId, version])
+  @@index([claimId])
+}
+
+model QuoteItem {
+  id          String       @id @default(cuid())
+  quoteId     String
+  partKey     String
+  action      RepairAction
+  /// Centavos
+  partPrice   Int          @default(0)
+  /// Centavos
+  laborPrice  Int          @default(0)
+  coverage    Coverage     @default(PENDENTE)
+  insurerNote String?
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@unique([quoteId, partKey])
+  @@index([quoteId])
+}
+
+/// Linha do tempo imutável do sinistro
+model ClaimEvent {
+  id         String         @id @default(cuid())
+  claimId    String
+  actorId    String
+  type       ClaimEventType
+  fromStatus ClaimStatus?
+  toStatus   ClaimStatus?
+  message    String
+  createdAt  DateTime       @default(now())
+
+  claim Claim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  actor User  @relation(fields: [actorId], references: [id])
+
+  @@index([claimId, createdAt])
+}
+
+model Attachment {
+  id         String         @id @default(cuid())
+  claimId    String
+  uploaderId String
+  url        String
+  name       String
+  kind       AttachmentKind
+  createdAt  DateTime       @default(now())
+
+  claim    Claim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  uploader User  @relation(fields: [uploaderId], references: [id])
+
+  @@index([claimId])
+}
