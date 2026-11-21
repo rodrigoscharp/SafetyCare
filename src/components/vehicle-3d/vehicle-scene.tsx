@@ -1,6 +1,6 @@
 "use client";
 
-import { CameraControls, ContactShadows, Environment, Html, Lightformer, useCursor } from "@react-three/drei";
+import { CameraControls, ContactShadows, Environment, Html, Lightformer, MeshReflectorMaterial, useCursor } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import CameraControlsImpl from "camera-controls";
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -281,8 +281,24 @@ function SceneContent({
       </group>
 
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.002, 0]} receiveShadow>
-        <circleGeometry args={[model.camera.maxDistance * 0.42, 96]} />
-        <meshStandardMaterial color="#8a93a6" transparent opacity={0.12} roughness={1} />
+        <circleGeometry args={[model.camera.maxDistance * 0.45, 96]} />
+        {/* piso de estúdio: reflexo borrado do veículo, mistura com o fundo da página */}
+        <MeshReflectorMaterial
+          color="#7d8598"
+          transparent
+          opacity={0.35}
+          blur={[400, 120]}
+          resolution={512}
+          mixBlur={1}
+          mixStrength={1.6}
+          mixContrast={1}
+          roughness={0.9}
+          metalness={0.2}
+          depthScale={1}
+          minDepthThreshold={0.4}
+          maxDepthThreshold={1.2}
+          mirror={0.6}
+        />
       </mesh>
       <ContactShadows position={[0, 0.001, 0]} opacity={0.65} scale={12} blur={2.2} far={2} resolution={1024} />
       <ContactShadows position={[0, 0.002, 0]} opacity={0.55} scale={7} blur={0.6} far={0.6} resolution={512} />

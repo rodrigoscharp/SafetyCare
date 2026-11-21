@@ -1,4 +1,5 @@
 import {
+  BufferAttribute,
   BufferGeometry,
   CatmullRomCurve3,
   CylinderGeometry,
@@ -10,7 +11,7 @@ import {
   Vector2,
   Vector3,
 } from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { MaterialKind, MeshSpec } from "./model-provider";
 
 export type P = [number, number];
@@ -71,9 +72,10 @@ export function shapeFrom(points: P[]): Shape {
 }
 
 /** Extrusão no eixo Z, centrada em z = 0. */
-export function extrudeCentered(points: P[], depth: number, bevel = 0, segments = 3): ExtrudeGeometry {
+export function extrudeCentered(points: P[], depth: number, bevel = 0, segments = 3, steps = 1): ExtrudeGeometry {
   const g = new ExtrudeGeometry(shapeFrom(points), {
     depth,
+    steps,
     bevelEnabled: bevel > 0,
     bevelThickness: bevel,
     bevelSize: bevel,
@@ -207,4 +209,47 @@ export function mirrorZ(geometry: BufferGeometry): BufferGeometry {
     attr.needsUpdate = true;
   }
   return g;
+}
+
+/** Reamostra uma polilinha fechada para que nenhum segmento passe de `maxSeg` (deformações ficam suaves). */
+export function densify(points: P[], maxSeg: number): P[] {
+  const out: P[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / maxSeg));
+    for (let k = 0; k < n; k++) out.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+  }
+  return out;
+}
+
+/** Deforma cada vértice (posição em coordenadas do mundo). */
+export function warpGeometry(g: BufferGeometry, fn: (x: number, y: number, z: number) => [number, number, number]): BufferGeometry {
+  const pos = g.getAttribute("position");
+  for (let i = 0; i < pos.count; i++) {
+    const [x, y, z] = fn(pos.getX(i), pos.getY(i), pos.getZ(i));
+    pos.setXYZ(i, x, y, z);
+  }
+  pos.needsUpdate = true;
+  return g;
+}
+
+/**
+ * Costura vértices repetidos e recalcula normais suaves (a luz corre contínua pela superfície,
+ * sem facetas). Gera UV planar simples para a textura de hachura.
+ */
+export function smoothGeometry(g: BufferGeometry, uvScale = 1.5): BufferGeometry {
+  const base = g.index ? g.toNonIndexed() : g.clone();
+  base.deleteAttribute("uv");
+  base.deleteAttribute("normal");
+  const merged = mergeVertices(base, 1e-4);
+  merged.computeVertexNormals();
+  const pos = merged.getAttribute("position");
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    uv[i * 2] = (pos.getX(i) + pos.getZ(i)) * uvScale;
+    uv[i * 2 + 1] = pos.getY(i) * uvScale;
+  }
+  merged.setAttribute("uv", new BufferAttribute(uv, 2));
+  return merged;
 }

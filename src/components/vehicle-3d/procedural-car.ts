@@ -3,14 +3,17 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import {
   arcPoints,
   clipPolygon,
+  densify,
   extrudeCentered,
   merge,
   mirrorZ,
   rimGeometry,
+  smoothGeometry,
   spec,
   stripBelow,
   tireGeometry,
   trapezoidPanel,
+  warpGeometry,
   type P,
   type V3,
 } from "./geometry";
@@ -31,8 +34,12 @@ const BODY_DEPTH = 1.62; // largura da extrusão antes do arredondamento
 const BEVEL = 0.075;
 const SIDE_Z = BODY_DEPTH / 2 + BEVEL; // face lateral da carroceria
 
-/** Silhueta lateral da carroceria (sem a cabine). */
+/** Silhueta lateral da carroceria (sem a cabine), reamostrada para deformar suave. */
 function silhouette(): P[] {
+  return densify(rawSilhouette(), 0.06);
+}
+
+function rawSilhouette(): P[] {
   return [
     [2.05, 0.24],
     [2.15, 0.3],
@@ -64,22 +71,49 @@ function silhouette(): P[] {
   ];
 }
 
+const smoothstep = (a: number, b: number, v: number) => {
+  const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Esculpe a carroceria: frente e traseira afinam vistas de cima, a lateral estufa na altura
+ * das portas, a cabine se inclina para dentro (tumblehome) e capô/teto ganham abaulamento.
+ */
+export function carWarp(x: number, y: number, z: number): [number, number, number] {
+  const t = Math.max(0, (Math.abs(x) - 1.25) / 0.95);
+  const plan = 1 - 0.17 * t * t;
+  const bulge = 1 + 0.03 * Math.exp(-((y - 0.6) ** 2) / 0.05);
+  const tumble = 1 - 0.14 * smoothstep(0.93, 1.45, y);
+  const nz = z * plan * bulge * tumble;
+  const crown = 0.045 * smoothstep(0.74, 0.98, y) * (1 - Math.min(1, (nz / 0.86) ** 2));
+  const noseDrop = 0.03 * t * t * smoothstep(0.6, 0.9, y);
+  return [x, y + crown - noseDrop, nz];
+}
+
+/** Leva a geometria ao mundo, esculpe, suaviza e recentraliza. */
+function sculpt(g: BufferGeometry, material: MaterialKind, offset: V3 = [0, 0, 0]): MeshSpec {
+  g.translate(offset[0], offset[1], offset[2]);
+  warpGeometry(g, carWarp);
+  return spec(smoothGeometry(g), material);
+}
+
 /** Cabine (vidros laterais) vista de lado. */
-const GREENHOUSE: P[] = [
+const GREENHOUSE: P[] = densify([
   [1.08, 0.93],
   [0.34, 1.4],
   [0, 1.43],
   [-0.5, 1.43],
   [-0.84, 1.4],
   [-1.47, 0.97],
-];
+], 0.06);
 
 const both = (fn: (side: 1 | -1, suffix: "dir" | "esq") => PartMeshSpec): PartMeshSpec[] => [fn(1, "dir"), fn(-1, "esq")];
 
 function sidePanel(key: string, side: 1 | -1, xMin: number, xMax: number, yMin: number, yMax: number): PartMeshSpec {
   const pts = clipPolygon(silhouette(), xMin, xMax, yMin, yMax);
   const g = extrudeCentered(pts, 0.012, 0.012, 2);
-  return { key, ...spec(g, "body", [0, 0, side * (SIDE_Z + 0.008)]) };
+  return { key, ...sculpt(g, "body", [0, 0, side * (SIDE_Z + 0.008)]) };
 }
 
 function mirrored(g: () => BufferGeometry, side: 1 | -1) {
@@ -92,8 +126,8 @@ export function buildCar(): VehicleModel {
   const parts: PartMeshSpec[] = [];
 
   // Para-choques: recortes da frente/traseira, envolvendo toda a largura
-  parts.push({ key: "parachoque_dianteiro", ...spec(extrudeCentered(clipPolygon(sil, 1.9, 2.4, 0.2, 0.62), BODY_DEPTH + 0.02, 0.085, 4), "body") });
-  parts.push({ key: "parachoque_traseiro", ...spec(extrudeCentered(clipPolygon(sil, -2.4, -1.92, 0.2, 0.64), BODY_DEPTH + 0.02, 0.085, 4), "body") });
+  parts.push({ key: "parachoque_dianteiro", ...sculpt(extrudeCentered(clipPolygon(sil, 1.9, 2.4, 0.2, 0.62), BODY_DEPTH + 0.05, 0.09, 4, 18), "body", [0.018, -0.004, 0]) });
+  parts.push({ key: "parachoque_traseiro", ...sculpt(extrudeCentered(clipPolygon(sil, -2.4, -1.92, 0.2, 0.64), BODY_DEPTH + 0.05, 0.09, 4, 18), "body", [-0.018, -0.004, 0]) });
 
   // Laterais
   parts.push(...both((s, n) => sidePanel(`paralama_dianteiro_${n}`, s, 1.03, 1.95, 0.27, 0.93)));
@@ -104,20 +138,20 @@ export function buildCar(): VehicleModel {
   // Capô, tampa e teto: faixas que seguem a linha superior
   parts.push({
     key: "capo",
-    ...spec(extrudeCentered(stripBelow([[1.92, 0.808], [1.6, 0.868], [1.3, 0.918], [1.1, 0.946]], 0.035), 1.5, 0.03, 3), "body", [0, 0.012, 0]),
+    ...sculpt(extrudeCentered(densify(stripBelow([[1.92, 0.808], [1.6, 0.868], [1.3, 0.918], [1.1, 0.946]], 0.035), 0.06), 1.5, 0.03, 3, 16), "body", [0, 0.012, 0]),
   });
   parts.push({
     key: "tampa_porta_malas",
-    ...spec(extrudeCentered(stripBelow([[-1.49, 0.992], [-1.75, 0.977], [-1.97, 0.942], [-2.1, 0.885]], 0.035), 1.5, 0.03, 3), "body", [0, 0.012, 0]),
+    ...sculpt(extrudeCentered(densify(stripBelow([[-1.49, 0.992], [-1.75, 0.977], [-1.97, 0.942], [-2.1, 0.885]], 0.035), 0.06), 1.5, 0.03, 3, 16), "body", [0, 0.012, 0]),
   });
   parts.push({
     key: "teto",
-    ...spec(extrudeCentered(stripBelow([[0.32, 1.405], [0, 1.435], [-0.5, 1.435], [-0.82, 1.405]], 0.04), 1.22, 0.035, 3), "body", [0, 0.015, 0]),
+    ...sculpt(extrudeCentered(densify(stripBelow([[0.32, 1.405], [0, 1.435], [-0.5, 1.435], [-0.82, 1.405]], 0.04), 0.06), 1.22, 0.035, 3, 14), "body", [0, 0.015, 0]),
   });
 
   // Vidros (afinam em direção ao teto)
-  parts.push({ key: "parabrisa", ...spec(trapezoidPanel([1.06, 0.95], [0.38, 1.385], 1.4, 1.18, 0.012, 0.012), "glass") });
-  parts.push({ key: "vidro_traseiro", ...spec(trapezoidPanel([-1.44, 0.985], [-0.86, 1.385], 1.36, 1.16, 0.012, 0.012), "glass") });
+  parts.push({ key: "parabrisa", ...sculpt(trapezoidPanel([1.06, 0.95], [0.38, 1.385], 1.4, 1.18, 0.012, 0.012), "glass") });
+  parts.push({ key: "vidro_traseiro", ...sculpt(trapezoidPanel([-1.44, 0.985], [-0.86, 1.385], 1.36, 1.16, 0.012, 0.012), "glass") });
 
   // Faróis (lente inclinada acompanhando o nariz) e lanternas (faixa na traseira)
   parts.push(
@@ -125,7 +159,7 @@ export function buildCar(): VehicleModel {
       const g = new RoundedBoxGeometry(0.2, 0.085, 0.38, 3, 0.03);
       g.rotateZ(-0.42);
       g.rotateY(s * 0.18);
-      return { key: `farol_${n}`, geometry: g, position: [2.08, 0.725, s * 0.56] as V3, material: "headlight" };
+      return { key: `farol_${n}`, ...sculpt(g, "headlight", [2.08, 0.725, s * 0.56]) };
     }),
   );
   parts.push(
@@ -133,7 +167,7 @@ export function buildCar(): VehicleModel {
       const g = new RoundedBoxGeometry(0.06, 0.1, 0.42, 3, 0.025);
       g.rotateZ(0.5);
       g.rotateY(-s * 0.15);
-      return { key: `lanterna_${n}`, geometry: g, position: [-2.13, 0.83, s * 0.56] as V3, material: "taillight" };
+      return { key: `lanterna_${n}`, ...sculpt(g, "taillight", [-2.13, 0.83, s * 0.56]) };
     }),
   );
 
@@ -148,7 +182,7 @@ export function buildCar(): VehicleModel {
         arm.translate(0.02, -0.03, 0);
         return merge([head, arm]);
       }, s);
-      return { key: `retrovisor_${n}`, ...spec(geo, "body", [0.96, 1.02, s * (SIDE_Z + 0.02)]) };
+      return { key: `retrovisor_${n}`, ...sculpt(geo, "body", [0.96, 1.02, s * (SIDE_Z + 0.02)]) };
     }),
   );
 
@@ -169,21 +203,34 @@ export function buildCar(): VehicleModel {
 
   const decor: MeshSpec[] = [];
   // Carroceria (núcleo) e cabine
-  decor.push(spec(extrudeCentered(sil, BODY_DEPTH, BEVEL, 5), "body"));
-  decor.push(spec(extrudeCentered(GREENHOUSE, 1.24, 0.07, 5), "glass", [0, 0, 0]));
+  decor.push(sculpt(extrudeCentered(sil, BODY_DEPTH, BEVEL, 5, 20), "body"));
+  decor.push(sculpt(extrudeCentered(GREENHOUSE, 1.24, 0.07, 5, 14), "glass"));
   // Colunas B e C na cor da carroceria, sobre os vidros laterais
   for (const s of [1, -1]) {
-    decor.push(spec(extrudeCentered([[0.08, 0.97], [0.14, 0.97], [0.06, 1.41], [-0.02, 1.41]], 0.01, 0.01, 2), "body", [0, 0, s * 0.695]));
-    decor.push(spec(extrudeCentered([[-1.1, 0.98], [-0.94, 0.98], [-0.74, 1.4], [-0.86, 1.4]], 0.01, 0.01, 2), "body", [0, 0, s * 0.695]));
+    decor.push(sculpt(extrudeCentered([[0.08, 0.97], [0.14, 0.97], [0.06, 1.41], [-0.02, 1.41]], 0.01, 0.01, 2), "body", [0, 0, s * 0.695]));
+    decor.push(sculpt(extrudeCentered([[-1.1, 0.98], [-0.94, 0.98], [-0.74, 1.4], [-0.86, 1.4]], 0.01, 0.01, 2), "body", [0, 0, s * 0.695]));
   }
   // Colunas (molduras escuras das janelas) e soleira
-  decor.push(spec(extrudeCentered(stripBelow([[1.0, 0.985], [0, 1.0], [-1.4, 1.0]], 0.03), 1.42, 0.02), "dark"));
-  decor.push(spec(extrudeCentered(clipPolygon(sil, -0.9, 0.9, 0.2, 0.33), BODY_DEPTH + 0.04, 0.04), "dark"));
+  decor.push(sculpt(extrudeCentered(densify(stripBelow([[1.0, 0.985], [0, 1.0], [-1.4, 1.0]], 0.03), 0.06), 1.42, 0.02, 2, 12), "dark"));
+  decor.push(sculpt(extrudeCentered(clipPolygon(sil, -0.9, 0.9, 0.2, 0.33), BODY_DEPTH + 0.04, 0.04, 3, 12), "dark"));
+  // Forro escuro dentro das caixas de roda (não se vê o "oco" da carroceria)
+  for (const x of [WHEEL_X, -WHEEL_X]) {
+    const liner = new CylinderGeometry(ARCH_R - 0.012, ARCH_R - 0.012, BODY_DEPTH + 0.1, 40, 1, true, Math.PI / 2, Math.PI);
+    liner.rotateX(Math.PI / 2);
+    decor.push({ geometry: mirrorZ(liner), position: [x, WHEEL_Y, 0], material: "dark" });
+  }
+  // Luz diurna de LED sob os faróis
+  for (const s of [1, -1]) {
+    const drl = new RoundedBoxGeometry(0.03, 0.018, 0.32, 2, 0.008);
+    drl.rotateZ(-0.6);
+    drl.rotateY(s * 0.2);
+    decor.push(sculpt(drl, "headlight", [2.13, 0.655, s * 0.54]));
+  }
   // Grade, entrada de ar inferior, placas e assoalho
-  decor.push({ geometry: new RoundedBoxGeometry(0.05, 0.15, 0.82, 3, 0.03), position: [2.17, 0.6, 0], material: "dark" });
-  decor.push({ geometry: new RoundedBoxGeometry(0.05, 0.1, 1.1, 3, 0.03), position: [2.2, 0.36, 0], material: "dark" });
-  decor.push({ geometry: new RoundedBoxGeometry(0.02, 0.11, 0.36, 2, 0.01), position: [2.215, 0.46, 0], material: "plate" });
-  decor.push({ geometry: new RoundedBoxGeometry(0.02, 0.11, 0.36, 2, 0.01), position: [-2.225, 0.58, 0], material: "plate" });
+  decor.push(sculpt(new RoundedBoxGeometry(0.05, 0.15, 0.82, 3, 0.03), "dark", [2.165, 0.6, 0]));
+  decor.push(sculpt(new RoundedBoxGeometry(0.05, 0.1, 1.1, 3, 0.03), "dark", [2.2, 0.36, 0]));
+  decor.push(sculpt(new RoundedBoxGeometry(0.02, 0.11, 0.36, 2, 0.01), "plate", [2.215, 0.46, 0]));
+  decor.push(sculpt(new RoundedBoxGeometry(0.02, 0.11, 0.36, 2, 0.01), "plate", [-2.225, 0.58, 0]));
   decor.push({ geometry: new RoundedBoxGeometry(3.9, 0.08, 1.5, 2, 0.03), position: [0, 0.2, 0], material: "dark" });
   // Maçanetas
   for (const x of [0.62, -0.38]) {
