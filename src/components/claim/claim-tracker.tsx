@@ -73,7 +73,7 @@ export function ClaimTracker({ status, viewer, facts, compact }: { status: Claim
           aria-label={`Progresso: ${pct}%`}
         >
           <div
-            className={cn("h-full rounded-full", j.tone === "danger" ? "bg-[#ff6369]" : "bg-brand-gradient")}
+            className={cn("h-full rounded-full transition-[width] duration-700 ease-out", j.tone === "danger" ? "bg-[#ff6369]" : "bg-brand-gradient")}
             style={{ width: `${Math.max(pct, 4)}%` }}
           />
           <div aria-hidden className="absolute inset-0 flex">
