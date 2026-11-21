@@ -2,6 +2,7 @@
 
 import { CameraControls, ContactShadows, Environment, Html, Lightformer, MeshReflectorMaterial, useCursor } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Bloom, EffectComposer, N8AO } from "@react-three/postprocessing";
 import CameraControlsImpl from "camera-controls";
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BackSide, CanvasTexture, Color, PerspectiveCamera, RepeatWrapping, SRGBColorSpace, type Mesh, type MeshPhysicalMaterial } from "three";
@@ -76,7 +77,7 @@ function DecorMesh({ spec, color }: { spec: MeshSpec; color: string }) {
         transparent={m.opacity !== undefined}
         opacity={m.opacity ?? 1}
         emissive={m.emissive ?? "#000000"}
-        emissiveIntensity={m.emissive ? 0.4 : 0}
+        emissiveIntensity={m.emissive ? (m.glow ?? 0.4) : 0}
       />
     </mesh>
   );
@@ -128,7 +129,7 @@ function PartMesh({
     const k = 1 - Math.exp(-delta * 14);
     const s = mesh.scale.x + (targetScale - mesh.scale.x) * k;
     mesh.scale.setScalar(s);
-    const targetEmissive = active ? 0.55 : base.emissive && visual === "INTACTA" ? 0.4 : stateColor ? 0.12 : 0;
+    const targetEmissive = active ? 0.55 : base.emissive && visual === "INTACTA" ? (base.glow ?? 0.4) : stateColor ? 0.12 : 0;
     mat.emissiveIntensity += (targetEmissive - mat.emissiveIntensity) * k;
   });
 
@@ -216,6 +217,7 @@ export default function VehicleScene(props: VehicleSceneProps) {
           </Html>
         ) : null}
         <ResponsiveFov />
+        <Effects />
         <CameraRig model={model} request={cameraRequest} autoRotate={autoRotate} engaged={engaged} />
       </Suspense>
     </Canvas>
@@ -365,4 +367,20 @@ function ResponsiveFov() {
     camera.updateProjectionMatrix();
   }, [camera, width, height]);
   return null;
+}
+
+/**
+ * Pós-processamento: oclusão de ambiente (sombras de contato nos cantos e frestas)
+ * e bloom só no que brilha acima de 1 (faróis, LED, lanternas). Desligado em palcos pequenos
+ * (celular), onde o custo não compensa.
+ */
+function Effects() {
+  const width = useThree((s) => s.size.width);
+  if (width < 560) return null;
+  return (
+    <EffectComposer multisampling={4} enableNormalPass={false}>
+      <N8AO aoRadius={0.45} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes />
+      <Bloom mipmapBlur luminanceThreshold={1} luminanceSmoothing={0.15} intensity={0.85} radius={0.6} />
+    </EffectComposer>
+  );
 }

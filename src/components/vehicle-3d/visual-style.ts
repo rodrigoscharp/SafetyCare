@@ -27,6 +27,8 @@ type MaterialBase = {
   clearcoat?: number;
   clearcoatRoughness?: number;
   emissive?: string;
+  /** Intensidade do brilho quando intacta (acima de ~1 acende o bloom) */
+  glow?: number;
 };
 
 export function baseMaterial(kind: MaterialKind, bodyColor: string): MaterialBase {
@@ -37,9 +39,9 @@ export function baseMaterial(kind: MaterialKind, bodyColor: string): MaterialBas
     case "glass":
       return { color: "#0b1220", roughness: 0.04, metalness: 0.85, opacity: 0.9, clearcoat: 1, clearcoatRoughness: 0 };
     case "headlight":
-      return { color: "#f4f7fb", roughness: 0.05, metalness: 0.6, emissive: "#cfe0ff", clearcoat: 1, clearcoatRoughness: 0 };
+      return { color: "#f4f7fb", roughness: 0.05, metalness: 0.6, emissive: "#d6e6ff", glow: 2.6, clearcoat: 1, clearcoatRoughness: 0 };
     case "taillight":
-      return { color: "#b0121c", roughness: 0.12, metalness: 0.3, emissive: "#5a0408", clearcoat: 1, clearcoatRoughness: 0 };
+      return { color: "#b0121c", roughness: 0.12, metalness: 0.3, emissive: "#ff1a2a", glow: 0.9, clearcoat: 1, clearcoatRoughness: 0 };
     case "tire":
       return { color: "#17181b", roughness: 0.9, metalness: 0 };
     case "chrome":
