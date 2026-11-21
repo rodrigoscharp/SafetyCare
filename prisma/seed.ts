@@ -103,6 +103,7 @@ async function main() {
         location: args.location,
         occurredAt: args.occurredAt,
         createdAt: args.createdAt,
+        updatedAt: args.steps.at(-1)?.at ?? args.createdAt,
         status: finalStatus,
         damages: { create: args.damages.map((d) => ({ ...d, source: "CLIENTE" as const })) },
         events: {
