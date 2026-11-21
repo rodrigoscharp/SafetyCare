@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: safetycare-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: safetycare
+      POSTGRES_PASSWORD: safetycare
+      POSTGRES_DB: safetycare
+    ports:
+      - "5434:5432"
+    volumes:
+      - safetycare-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U safetycare"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  safetycare-pg:
