@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ClaimTracker } from "@/components/claim/claim-tracker";
-import { Logo } from "@/components/logo";
+import { Logo, LogoMark } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export function AuthCard({ title, description, children }: { title: string; description: string; children: ReactNode }) {
@@ -12,17 +12,19 @@ export function AuthCard({ title, description, children }: { title: string; desc
           <ThemeToggle />
         </div>
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
-          <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+          <h1 className="text-4xl font-semibold tracking-[-0.035em]">{title}</h1>
           <p className="text-muted-foreground mt-2">{description}</p>
           <div className="mt-8">{children}</div>
         </div>
       </main>
-      <aside className="bg-accent/60 relative hidden overflow-hidden border-l lg:flex lg:flex-col lg:justify-center lg:p-12">
-        <div aria-hidden className="bg-primary/10 absolute -top-40 -left-40 size-[28rem] rounded-full" />
+      <aside className="dark bg-background text-foreground relative isolate hidden overflow-hidden lg:flex lg:flex-col lg:justify-center lg:p-14">
+        <div aria-hidden className="absolute -top-48 -right-32 -z-10 size-[34rem] rounded-full bg-[#4b4bff]/35 blur-[110px]" />
+        <div aria-hidden className="absolute -bottom-48 -left-32 -z-10 size-[30rem] rounded-full bg-[#00c9b7]/15 blur-[110px]" />
+        <LogoMark tone="mono" className="absolute -right-24 -bottom-24 -z-10 size-[26rem] text-white opacity-[0.04]" />
         <div className="relative mx-auto w-full max-w-lg">
-          <p className="text-primary text-sm font-semibold">Como um app de entrega, só que do seu sinistro</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-balance">Saiba em que etapa está, com quem está e quanto você vai pagar.</h2>
-          <div className="mt-8 rotate-[-1.5deg]">
+          <h2 className="text-4xl font-semibold tracking-[-0.035em] text-balance">Seu sinistro, peça por peça.</h2>
+          <p className="text-muted-foreground mt-3 text-lg">Em que etapa está, com quem está e quanto você vai pagar.</p>
+          <div className="mt-10">
             <ClaimTracker
               compact
               status="EM_REPARO"

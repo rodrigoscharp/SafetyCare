@@ -28,8 +28,10 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-              active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+              "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+              active
+                ? "bg-accent text-accent-foreground before:bg-brand-gradient before:absolute before:inset-y-2 before:-left-4 before:w-1 before:rounded-r-full"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
             <Icon className="size-[18px]" />
@@ -64,7 +66,7 @@ export function BottomNav({ items }: { items: NavItem[] }) {
                 )}
               >
                 {item.highlight ? (
-                  <span className="bg-primary text-primary-foreground -mt-5 grid size-12 place-items-center rounded-2xl shadow-lg shadow-primary/30">
+                  <span className="bg-brand-gradient -mt-5 grid size-12 place-items-center rounded-2xl text-white shadow-lg shadow-primary/30">
                     <Icon className="size-5" />
                   </span>
                 ) : (
