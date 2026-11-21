@@ -58,7 +58,7 @@ export default async function InsurerDashboard({ searchParams }: { searchParams:
 
       <div className="mb-4 flex flex-wrap gap-1.5" aria-label="Filtrar por status">
         <FilterChip href="/seguradora" active={!status && !group} label="Precisa da sua ação" />
-        {ALL_STATUSES.map((s) => (
+        {ALL_STATUSES.filter((s) => (counts[s] ?? 0) > 0 || status === s).map((s) => (
           <FilterChip key={s} href={`/seguradora?status=${s}`} active={status === s} label={`${STATUS_LABEL[s]} · ${counts[s] ?? 0}`} />
         ))}
       </div>

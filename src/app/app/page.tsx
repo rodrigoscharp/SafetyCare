@@ -62,7 +62,7 @@ export default async function ClientHome() {
                       vehicle: `${c.policy.vehicle.brand} ${c.policy.vehicle.model}`,
                       workshop: c.workshop?.name,
                       estimatedDays: q?.estimatedDays,
-                      clientPays: s && s.quoteTotal > 0 ? s.clientPays : null,
+                      clientPays: s && s.coveredTotal + s.notCoveredTotal > 0 ? s.clientPays : null,
                       provisional: s ? s.pendingTotal > 0 : false,
                     }}
                   />

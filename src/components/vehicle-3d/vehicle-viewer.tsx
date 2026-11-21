@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Maximize2, Minimize2, Move3d, Pause, RotateCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Hand, Maximize2, Minimize2, Move3d, Pause, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -56,6 +56,19 @@ export function VehicleViewer({
   const [cameraRequest, setCameraRequest] = useState<CameraRequest | null>(null);
   const [autoRotate, setAutoRotate] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // o 3D só "prende" rolagem e toque depois que o usuário interage com ele
+  const [engagedByUser, setEngagedByUser] = useState(false);
+  const engaged = expanded || engagedByUser;
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!engagedByUser) return;
+    const onDown = (e: PointerEvent) => {
+      if (stageRef.current && !stageRef.current.contains(e.target as Node)) setEngagedByUser(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [engagedByUser]);
 
   useEffect(() => {
     if (!expanded) return;
@@ -163,8 +176,13 @@ export function VehicleViewer({
       aria-label={expanded ? "Modelo 3D em tela cheia" : undefined}
     >
       <div
+        ref={stageRef}
+        onPointerDown={() => setEngagedByUser(true)}
+        onPointerLeave={(e) => e.pointerType === "mouse" && setEngagedByUser(false)}
+        onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setEngagedByUser(false)}
         className={cn(
-          "relative overflow-hidden rounded-3xl border",
+          "relative overflow-hidden rounded-3xl border transition-shadow",
+          engaged && !expanded && "ring-primary/40 ring-2",
           "bg-[radial-gradient(ellipse_at_50%_35%,var(--card)_0%,var(--accent)_70%,var(--muted)_100%)]",
           expanded ? "h-[calc(100dvh-1.5rem)] sm:h-[calc(100dvh-2rem)]" : "h-[440px] sm:h-[540px] lg:h-[620px]",
         )}
@@ -175,6 +193,7 @@ export function VehicleViewer({
           cameraPosition={cameraPosition}
           cameraRequest={cameraRequest}
           autoRotate={autoRotate}
+          engaged={engaged}
           color={bodyColor}
           states={states}
           activeKey={activeKey}
@@ -248,8 +267,16 @@ export function VehicleViewer({
               </button>
             ))}
           </div>
-          <p className="text-muted-foreground pointer-events-none hidden items-center gap-1.5 text-xs sm:flex">
-            <Move3d className="size-3.5" /> Arraste para girar · role para aproximar
+          <p className="text-muted-foreground pointer-events-none flex items-center gap-1.5 text-xs">
+            {engaged ? (
+              <>
+                <Move3d className="size-3.5" /> Arraste para girar · role ou use dois dedos para aproximar
+              </>
+            ) : (
+              <>
+                <Hand className="size-3.5" /> Toque ou clique no modelo para interagir
+              </>
+            )}
           </p>
         </div>
       </div>

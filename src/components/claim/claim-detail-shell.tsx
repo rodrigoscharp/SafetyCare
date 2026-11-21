@@ -49,7 +49,7 @@ export function ClaimDetailShell({
           vehicle: `${v.brand} ${v.model} · ${v.plate}`,
           workshop: claim.workshop?.name,
           estimatedDays: quote?.estimatedDays,
-          clientPays: summary && summary.quoteTotal > 0 ? summary.clientPays : null,
+          clientPays: summary && summary.coveredTotal + summary.notCoveredTotal > 0 ? summary.clientPays : null,
           provisional: summary ? summary.pendingTotal > 0 : false,
         }}
       />
@@ -58,7 +58,7 @@ export function ClaimDetailShell({
 
       <div className="grid min-w-0 gap-6">{children}</div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="min-w-0">
           <CardContent>
             <Tabs defaultValue="mensagens">

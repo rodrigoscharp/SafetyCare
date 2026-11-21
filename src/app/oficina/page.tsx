@@ -50,7 +50,7 @@ export default async function WorkshopQueue({ searchParams }: { searchParams: Pr
       </div>
       {filter.statuses.length > 1 ? (
         <div className="mb-4 flex flex-wrap gap-1.5" aria-label="Status">
-          {filter.statuses.map((s) => (
+          {filter.statuses.filter((s) => (counts[s] ?? 0) > 0 || status === s).map((s) => (
             <Link
               key={s}
               href={`/oficina?filtro=${filter.key}&status=${s}`}

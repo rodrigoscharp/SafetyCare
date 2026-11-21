@@ -1,9 +1,10 @@
 "use client";
 
 import { CameraControls, ContactShadows, Environment, Html, Lightformer, useCursor } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import CameraControlsImpl from "camera-controls";
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { BackSide, CanvasTexture, Color, RepeatWrapping, SRGBColorSpace, type Mesh, type MeshPhysicalMaterial } from "three";
+import { BackSide, CanvasTexture, Color, PerspectiveCamera, RepeatWrapping, SRGBColorSpace, type Mesh, type MeshPhysicalMaterial } from "three";
 import type { PartVisual } from "@/domain/part-status";
 import type { Severity } from "@prisma/client";
 import type { MeshSpec, PartMeshSpec, VehicleModel } from "./model-provider";
@@ -20,6 +21,8 @@ export type VehicleSceneProps = {
   /** Pedido de movimento de câmera (vistas prontas); muda o nonce para repetir */
   cameraRequest: CameraRequest | null;
   autoRotate: boolean;
+  /** Rolagem do mouse e toque de um dedo controlam a câmera (senão rolam a página) */
+  engaged: boolean;
   color: string;
   states: Record<string, PartRenderState>;
   activeKey: string | null;
@@ -174,7 +177,7 @@ function PartMesh({
 }
 
 export default function VehicleScene(props: VehicleSceneProps) {
-  const { model, cameraPosition, cameraRequest, autoRotate, color, states, activeKey, selectedKey, clickable, tooltip, onHover, onPartClick, onMissed } = props;
+  const { model, cameraPosition, cameraRequest, autoRotate, engaged, color, states, activeKey, selectedKey, clickable, tooltip, onHover, onPartClick, onMissed } = props;
   const activeSpec = activeKey ? model.parts.find((p) => p.key === activeKey) : undefined;
 
   return (
@@ -184,6 +187,7 @@ export default function VehicleScene(props: VehicleSceneProps) {
       camera={{ position: cameraPosition, fov: 35, near: 0.1, far: 100 }}
       onPointerMissed={onMissed}
       gl={{ antialias: true, preserveDrawingBuffer: false }}
+      style={{ touchAction: engaged ? "none" : "pan-y" }}
       aria-label="Modelo 3D do veículo"
     >
       <Suspense fallback={null}>
@@ -207,7 +211,8 @@ export default function VehicleScene(props: VehicleSceneProps) {
             {tooltip}
           </Html>
         ) : null}
-        <CameraRig model={model} request={cameraRequest} autoRotate={autoRotate} />
+        <ResponsiveFov />
+        <CameraRig model={model} request={cameraRequest} autoRotate={autoRotate} engaged={engaged} />
       </Suspense>
     </Canvas>
   );
@@ -222,7 +227,7 @@ function SceneContent({
   clickable,
   onHover,
   onPartClick,
-}: Omit<VehicleSceneProps, "tooltip" | "onMissed" | "cameraPosition" | "cameraRequest" | "autoRotate">) {
+}: Omit<VehicleSceneProps, "tooltip" | "onMissed" | "cameraPosition" | "cameraRequest" | "autoRotate" | "engaged">) {
   const hatch = useHatchTexture();
   return (
     <>
@@ -265,7 +270,7 @@ function SceneContent({
   );
 }
 
-function CameraRig({ model, request, autoRotate }: { model: VehicleModel; request: CameraRequest | null; autoRotate: boolean }) {
+function CameraRig({ model, request, autoRotate, engaged }: { model: VehicleModel; request: CameraRequest | null; autoRotate: boolean; engaged: boolean }) {
   const ref = useRef<CameraControls>(null);
   const [tx, ty, tz] = model.camera.target;
 
@@ -278,6 +283,16 @@ function CameraRig({ model, request, autoRotate }: { model: VehicleModel; reques
     const [x, y, z] = request.position;
     void ref.current.setLookAt(x, y, z, tx, ty, tz, true);
   }, [request, tx, ty, tz]);
+
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const A = CameraControlsImpl.ACTION;
+    c.mouseButtons.wheel = engaged ? A.DOLLY : A.NONE;
+    c.mouseButtons.right = A.NONE;
+    c.touches.one = engaged ? A.TOUCH_ROTATE : A.NONE;
+    c.touches.two = A.TOUCH_DOLLY_ROTATE;
+  }, [engaged]);
 
   useFrame((_, delta) => {
     if (autoRotate && ref.current) ref.current.azimuthAngle += delta * 0.35;
@@ -296,4 +311,22 @@ function CameraRig({ model, request, autoRotate }: { model: VehicleModel; reques
       dollySpeed={0.6}
     />
   );
+}
+
+const BASE_FOV = 35;
+/** Aspecto a partir do qual o enquadramento horizontal é preservado (palco "em pé" no celular). */
+const MIN_ASPECT = 1.25;
+
+/** Em telas estreitas, abre o FOV vertical para manter a largura do veículo visível. */
+function ResponsiveFov() {
+  const camera = useThree((s) => s.camera);
+  const { width, height } = useThree((s) => s.size);
+  useEffect(() => {
+    if (!(camera instanceof PerspectiveCamera) || !height) return;
+    const aspect = width / height;
+    const half = (BASE_FOV * Math.PI) / 360;
+    camera.fov = aspect >= MIN_ASPECT ? BASE_FOV : (2 * Math.atan((Math.tan(half) * MIN_ASPECT) / aspect) * 180) / Math.PI;
+    camera.updateProjectionMatrix();
+  }, [camera, width, height]);
+  return null;
 }
