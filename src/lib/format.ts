@@ -38,3 +38,22 @@ export function parseBRLToCents(input: string): number | null {
 export function centsToInput(cents: number): string {
   return (cents / 100).toFixed(2).replace(".", ",");
 }
+
+/** "YYYY-MM-DDTHH:mm" digitado no fuso de São Paulo (UTC-3, sem horário de verão) → Date UTC. */
+export function parseSaoPauloDateTime(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}:00-03:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** "YYYY-MM-DD" (data local) → Date UTC ao fim do dia em São Paulo. */
+export function parseSaoPauloDate(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}T23:59:59-03:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Date → "YYYY-MM-DD" no fuso de São Paulo (para inputs). */
+export function toSaoPauloDateInput(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d);
+}
