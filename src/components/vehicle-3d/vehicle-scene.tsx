@@ -1,7 +1,8 @@
 "use client";
 
-import { CameraControls, ContactShadows, Environment, Html, Lightformer, useCursor } from "@react-three/drei";
+import { CameraControls, ContactShadows, Environment, Html, Lightformer, MeshReflectorMaterial, useCursor } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Bloom, EffectComposer, N8AO } from "@react-three/postprocessing";
 import CameraControlsImpl from "camera-controls";
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BackSide, CanvasTexture, Color, PerspectiveCamera, RepeatWrapping, SRGBColorSpace, type Mesh, type MeshPhysicalMaterial } from "three";
@@ -71,10 +72,12 @@ function DecorMesh({ spec, color }: { spec: MeshSpec; color: string }) {
         roughness={m.roughness}
         metalness={m.metalness}
         clearcoat={m.clearcoat ?? 0}
+        clearcoatRoughness={m.clearcoatRoughness ?? 0.1}
+        envMapIntensity={1.35}
         transparent={m.opacity !== undefined}
         opacity={m.opacity ?? 1}
         emissive={m.emissive ?? "#000000"}
-        emissiveIntensity={m.emissive ? 0.4 : 0}
+        emissiveIntensity={m.emissive ? (m.glow ?? 0.4) : 0}
       />
     </mesh>
   );
@@ -126,7 +129,7 @@ function PartMesh({
     const k = 1 - Math.exp(-delta * 14);
     const s = mesh.scale.x + (targetScale - mesh.scale.x) * k;
     mesh.scale.setScalar(s);
-    const targetEmissive = active ? 0.55 : base.emissive && visual === "INTACTA" ? 0.4 : stateColor ? 0.12 : 0;
+    const targetEmissive = active ? 0.55 : base.emissive && visual === "INTACTA" ? (base.glow ?? 0.4) : stateColor ? 0.12 : 0;
     mat.emissiveIntensity += (targetEmissive - mat.emissiveIntensity) * k;
   });
 
@@ -162,6 +165,8 @@ function PartMesh({
         roughness={stateColor ? 0.45 : base.roughness}
         metalness={stateColor ? 0.15 : base.metalness}
         clearcoat={base.clearcoat ?? 0}
+        clearcoatRoughness={base.clearcoatRoughness ?? 0.1}
+        envMapIntensity={1.35}
         transparent={base.opacity !== undefined && !stateColor}
         opacity={stateColor ? 1 : (base.opacity ?? 1)}
         emissive={emissive}
@@ -186,7 +191,7 @@ export default function VehicleScene(props: VehicleSceneProps) {
       shadows
       camera={{ position: cameraPosition, fov: 35, near: 0.1, far: 100 }}
       onPointerMissed={onMissed}
-      gl={{ antialias: true, preserveDrawingBuffer: false }}
+      gl={{ antialias: true, preserveDrawingBuffer: false, toneMappingExposure: 1.05 }}
       style={{ touchAction: engaged ? "none" : "pan-y" }}
       aria-label="Modelo 3D do veículo"
     >
@@ -212,6 +217,7 @@ export default function VehicleScene(props: VehicleSceneProps) {
           </Html>
         ) : null}
         <ResponsiveFov />
+        <Effects />
         <CameraRig model={model} request={cameraRequest} autoRotate={autoRotate} engaged={engaged} />
       </Suspense>
     </Canvas>
@@ -231,14 +237,29 @@ function SceneContent({
   const hatch = useHatchTexture();
   return (
     <>
-      <ambientLight intensity={0.35} />
-      <directionalLight position={[4, 7, 4]} intensity={1.6} castShadow shadow-mapSize={[1024, 1024]} />
-      <directionalLight position={[-5, 3, -4]} intensity={0.5} />
-      <Environment resolution={256} frames={1}>
-        <Lightformer form="rect" intensity={2.2} position={[0, 5, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[10, 4, 1]} />
-        <Lightformer form="rect" intensity={1.2} position={[-6, 2, 1]} rotation={[0, Math.PI / 2, 0]} scale={[8, 2, 1]} />
-        <Lightformer form="rect" intensity={1.2} position={[6, 2, -1]} rotation={[0, -Math.PI / 2, 0]} scale={[8, 2, 1]} />
-        <Lightformer form="ring" intensity={0.8} position={[0, 1, 8]} scale={4} />
+      <hemisphereLight args={["#ffffff", "#3a4256", 0.35]} />
+      <directionalLight
+        position={[4, 8, 3]}
+        intensity={1.5}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.02}
+        shadow-camera-left={-4}
+        shadow-camera-right={4}
+        shadow-camera-top={4}
+        shadow-camera-bottom={-4}
+      />
+      <directionalLight position={[-6, 3, -5]} intensity={0.45} color="#c9d4ff" />
+      {/* Estúdio: softbox no teto + faixas de luz que desenham reflexos na lataria */}
+      <Environment resolution={512} frames={1}>
+        <Lightformer form="rect" intensity={2.4} position={[0, 7, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[14, 7, 1]} />
+        <Lightformer form="rect" intensity={5} position={[0, 2.6, -7]} scale={[20, 0.35, 1]} />
+        <Lightformer form="rect" intensity={5} position={[0, 1.6, 7]} rotation={[0, Math.PI, 0]} scale={[20, 0.3, 1]} />
+        <Lightformer form="rect" intensity={3} position={[-8, 2.2, 0]} rotation={[0, Math.PI / 2, 0]} scale={[14, 0.5, 1]} />
+        <Lightformer form="rect" intensity={3} position={[8, 2.2, 0]} rotation={[0, -Math.PI / 2, 0]} scale={[14, 0.5, 1]} />
+        <Lightformer form="rect" intensity={1.2} position={[0, 0.4, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[14, 14, 1]} color="#5a6170" />
+        <Lightformer form="ring" intensity={2} position={[6, 4, 6]} scale={3} />
       </Environment>
 
       <group>
@@ -262,10 +283,27 @@ function SceneContent({
       </group>
 
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.002, 0]} receiveShadow>
-        <circleGeometry args={[model.camera.maxDistance * 0.42, 96]} />
-        <meshStandardMaterial color="#8a93a6" transparent opacity={0.12} roughness={1} />
+        <circleGeometry args={[model.camera.maxDistance * 0.45, 96]} />
+        {/* piso de estúdio: reflexo borrado do veículo, mistura com o fundo da página */}
+        <MeshReflectorMaterial
+          color="#7d8598"
+          transparent
+          opacity={0.35}
+          blur={[400, 120]}
+          resolution={512}
+          mixBlur={1}
+          mixStrength={1.6}
+          mixContrast={1}
+          roughness={0.9}
+          metalness={0.2}
+          depthScale={1}
+          minDepthThreshold={0.4}
+          maxDepthThreshold={1.2}
+          mirror={0.6}
+        />
       </mesh>
-      <ContactShadows position={[0, 0.001, 0]} opacity={0.5} scale={12} blur={2.4} far={2.5} resolution={512} />
+      <ContactShadows position={[0, 0.001, 0]} opacity={0.65} scale={12} blur={2.2} far={2} resolution={1024} />
+      <ContactShadows position={[0, 0.002, 0]} opacity={0.55} scale={7} blur={0.6} far={0.6} resolution={512} />
     </>
   );
 }
@@ -329,4 +367,20 @@ function ResponsiveFov() {
     camera.updateProjectionMatrix();
   }, [camera, width, height]);
   return null;
+}
+
+/**
+ * Pós-processamento: oclusão de ambiente (sombras de contato nos cantos e frestas)
+ * e bloom só no que brilha acima de 1 (faróis, LED, lanternas). Desligado em palcos pequenos
+ * (celular), onde o custo não compensa.
+ */
+function Effects() {
+  const width = useThree((s) => s.size.width);
+  if (width < 560) return null;
+  return (
+    <EffectComposer multisampling={4} enableNormalPass={false}>
+      <N8AO aoRadius={0.45} distanceFalloff={0.6} intensity={2.4} quality="medium" halfRes />
+      <Bloom mipmapBlur luminanceThreshold={1} luminanceSmoothing={0.15} intensity={0.85} radius={0.6} />
+    </EffectComposer>
+  );
 }

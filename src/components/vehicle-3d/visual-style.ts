@@ -19,25 +19,40 @@ export const SEVERITY_COLOR: Record<Severity, string> = {
 
 export const OUTLINE_NOT_COVERED = "#ef4444";
 
-type MaterialBase = { color: string; roughness: number; metalness: number; opacity?: number; clearcoat?: number; emissive?: string };
+type MaterialBase = {
+  color: string;
+  roughness: number;
+  metalness: number;
+  opacity?: number;
+  clearcoat?: number;
+  clearcoatRoughness?: number;
+  emissive?: string;
+  /** Intensidade do brilho quando intacta (acima de ~1 acende o bloom) */
+  glow?: number;
+};
 
 export function baseMaterial(kind: MaterialKind, bodyColor: string): MaterialBase {
   switch (kind) {
     case "body":
-      return { color: bodyColor, roughness: 0.38, metalness: 0.35, clearcoat: 0.8 };
+      // pintura metálica com verniz
+      return { color: bodyColor, roughness: 0.3, metalness: 0.3, clearcoat: 1, clearcoatRoughness: 0.04 };
     case "glass":
-      return { color: "#16202c", roughness: 0.08, metalness: 0.3, opacity: 0.82, clearcoat: 1 };
+      return { color: "#0b1220", roughness: 0.04, metalness: 0.85, opacity: 0.9, clearcoat: 1, clearcoatRoughness: 0 };
     case "headlight":
-      return { color: "#e9eef5", roughness: 0.1, metalness: 0.4, emissive: "#9fb4cc", clearcoat: 1 };
+      return { color: "#f4f7fb", roughness: 0.05, metalness: 0.6, emissive: "#d6e6ff", glow: 2.6, clearcoat: 1, clearcoatRoughness: 0 };
     case "taillight":
-      return { color: "#a3161f", roughness: 0.2, metalness: 0.2, emissive: "#3a0508", clearcoat: 1 };
+      return { color: "#b0121c", roughness: 0.12, metalness: 0.3, emissive: "#ff1a2a", glow: 0.9, clearcoat: 1, clearcoatRoughness: 0 };
     case "tire":
-      return { color: "#1b1c1f", roughness: 0.85, metalness: 0.05 };
+      return { color: "#17181b", roughness: 0.9, metalness: 0 };
     case "chrome":
-      return { color: "#c5cad0", roughness: 0.22, metalness: 0.95 };
+      return { color: "#d9dde2", roughness: 0.14, metalness: 1 };
+    case "metal":
+      return { color: "#8b9096", roughness: 0.42, metalness: 0.85 };
     case "dark":
-      return { color: "#2a2d33", roughness: 0.6, metalness: 0.3 };
+      return { color: "#202329", roughness: 0.55, metalness: 0.2, clearcoat: 0.3 };
     case "seat":
-      return { color: "#232428", roughness: 0.75, metalness: 0.05 };
+      return { color: "#1c1d21", roughness: 0.8, metalness: 0 };
+    case "plate":
+      return { color: "#eef1f5", roughness: 0.5, metalness: 0.1 };
   }
 }

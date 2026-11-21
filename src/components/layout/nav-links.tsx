@@ -15,10 +15,10 @@ function useActive() {
   return (item: NavItem) => (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`));
 }
 
-export function SidebarNav({ items }: { items: NavItem[] }) {
+export function TopNav({ items }: { items: NavItem[] }) {
   const isActive = useActive();
   return (
-    <nav className="grid gap-1" aria-label="Navegação principal">
+    <nav className="hidden items-center gap-1 md:flex" aria-label="Navegação principal">
       {items.map((item) => {
         const Icon = ICONS[item.icon];
         const active = isActive(item);
@@ -28,11 +28,11 @@ export function SidebarNav({ items }: { items: NavItem[] }) {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-              active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+              "flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
+              active ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            <Icon className="size-[18px]" />
+            <Icon className="size-4" />
             {item.label}
           </Link>
         );
@@ -46,7 +46,7 @@ export function BottomNav({ items }: { items: NavItem[] }) {
   if (items.length < 2) return null;
   return (
     <nav
-      className="bg-background/90 fixed inset-x-0 bottom-0 z-40 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden"
+      className="bg-background/90 fixed inset-x-0 bottom-0 z-40 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:hidden"
       aria-label="Navegação principal"
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-around px-2">
@@ -64,7 +64,7 @@ export function BottomNav({ items }: { items: NavItem[] }) {
                 )}
               >
                 {item.highlight ? (
-                  <span className="bg-primary text-primary-foreground -mt-5 grid size-12 place-items-center rounded-2xl shadow-lg shadow-primary/30">
+                  <span className="bg-brand-gradient -mt-5 grid size-12 place-items-center rounded-2xl text-white shadow-lg shadow-primary/30">
                     <Icon className="size-5" />
                   </span>
                 ) : (
