@@ -71,6 +71,8 @@ function DecorMesh({ spec, color }: { spec: MeshSpec; color: string }) {
         roughness={m.roughness}
         metalness={m.metalness}
         clearcoat={m.clearcoat ?? 0}
+        clearcoatRoughness={m.clearcoatRoughness ?? 0.1}
+        envMapIntensity={1.35}
         transparent={m.opacity !== undefined}
         opacity={m.opacity ?? 1}
         emissive={m.emissive ?? "#000000"}
@@ -162,6 +164,8 @@ function PartMesh({
         roughness={stateColor ? 0.45 : base.roughness}
         metalness={stateColor ? 0.15 : base.metalness}
         clearcoat={base.clearcoat ?? 0}
+        clearcoatRoughness={base.clearcoatRoughness ?? 0.1}
+        envMapIntensity={1.35}
         transparent={base.opacity !== undefined && !stateColor}
         opacity={stateColor ? 1 : (base.opacity ?? 1)}
         emissive={emissive}
@@ -186,7 +190,7 @@ export default function VehicleScene(props: VehicleSceneProps) {
       shadows
       camera={{ position: cameraPosition, fov: 35, near: 0.1, far: 100 }}
       onPointerMissed={onMissed}
-      gl={{ antialias: true, preserveDrawingBuffer: false }}
+      gl={{ antialias: true, preserveDrawingBuffer: false, toneMappingExposure: 1.05 }}
       style={{ touchAction: engaged ? "none" : "pan-y" }}
       aria-label="Modelo 3D do veículo"
     >
@@ -231,14 +235,29 @@ function SceneContent({
   const hatch = useHatchTexture();
   return (
     <>
-      <ambientLight intensity={0.35} />
-      <directionalLight position={[4, 7, 4]} intensity={1.6} castShadow shadow-mapSize={[1024, 1024]} />
-      <directionalLight position={[-5, 3, -4]} intensity={0.5} />
-      <Environment resolution={256} frames={1}>
-        <Lightformer form="rect" intensity={2.2} position={[0, 5, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[10, 4, 1]} />
-        <Lightformer form="rect" intensity={1.2} position={[-6, 2, 1]} rotation={[0, Math.PI / 2, 0]} scale={[8, 2, 1]} />
-        <Lightformer form="rect" intensity={1.2} position={[6, 2, -1]} rotation={[0, -Math.PI / 2, 0]} scale={[8, 2, 1]} />
-        <Lightformer form="ring" intensity={0.8} position={[0, 1, 8]} scale={4} />
+      <hemisphereLight args={["#ffffff", "#3a4256", 0.35]} />
+      <directionalLight
+        position={[4, 8, 3]}
+        intensity={1.5}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.02}
+        shadow-camera-left={-4}
+        shadow-camera-right={4}
+        shadow-camera-top={4}
+        shadow-camera-bottom={-4}
+      />
+      <directionalLight position={[-6, 3, -5]} intensity={0.45} color="#c9d4ff" />
+      {/* Estúdio: softbox no teto + faixas de luz que desenham reflexos na lataria */}
+      <Environment resolution={512} frames={1}>
+        <Lightformer form="rect" intensity={2.4} position={[0, 7, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[14, 7, 1]} />
+        <Lightformer form="rect" intensity={5} position={[0, 2.6, -7]} scale={[20, 0.35, 1]} />
+        <Lightformer form="rect" intensity={5} position={[0, 1.6, 7]} rotation={[0, Math.PI, 0]} scale={[20, 0.3, 1]} />
+        <Lightformer form="rect" intensity={3} position={[-8, 2.2, 0]} rotation={[0, Math.PI / 2, 0]} scale={[14, 0.5, 1]} />
+        <Lightformer form="rect" intensity={3} position={[8, 2.2, 0]} rotation={[0, -Math.PI / 2, 0]} scale={[14, 0.5, 1]} />
+        <Lightformer form="rect" intensity={1.2} position={[0, 0.4, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[14, 14, 1]} color="#5a6170" />
+        <Lightformer form="ring" intensity={2} position={[6, 4, 6]} scale={3} />
       </Environment>
 
       <group>
@@ -265,7 +284,8 @@ function SceneContent({
         <circleGeometry args={[model.camera.maxDistance * 0.42, 96]} />
         <meshStandardMaterial color="#8a93a6" transparent opacity={0.12} roughness={1} />
       </mesh>
-      <ContactShadows position={[0, 0.001, 0]} opacity={0.5} scale={12} blur={2.4} far={2.5} resolution={512} />
+      <ContactShadows position={[0, 0.001, 0]} opacity={0.65} scale={12} blur={2.2} far={2} resolution={1024} />
+      <ContactShadows position={[0, 0.002, 0]} opacity={0.55} scale={7} blur={0.6} far={0.6} resolution={512} />
     </>
   );
 }

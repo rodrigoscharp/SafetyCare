@@ -2,7 +2,7 @@ import type { VehicleType } from "@prisma/client";
 import type { BufferGeometry } from "three";
 
 /** Tipo de material base de uma peça (usado quando ela está intacta). */
-export type MaterialKind = "body" | "glass" | "headlight" | "taillight" | "tire" | "chrome" | "dark" | "seat";
+export type MaterialKind = "body" | "glass" | "headlight" | "taillight" | "tire" | "chrome" | "dark" | "seat" | "plate" | "metal";
 
 type Vec3 = [number, number, number];
 
