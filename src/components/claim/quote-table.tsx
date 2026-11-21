@@ -44,7 +44,7 @@ export function ActionDot({ action }: { action: RepairAction }) {
 export function QuoteTable({ items, showCoverage = true }: { items: QuoteTableItem[]; showCoverage?: boolean }) {
   const t = quoteTotals(items);
   return (
-    <div className="overflow-x-auto">
+    <div className="min-w-0 overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { ClaimDetailShell } from "@/components/claim/claim-detail-shell";
+import { FinancialSummaryView } from "@/components/claim/financial-summary";
 import { QuoteTable } from "@/components/claim/quote-table";
 import { VehicleViewer } from "@/components/vehicle-3d";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { canEditQuote } from "@/domain/permissions";
+import { financialSummary } from "@/domain/quote";
 import { QUOTE_STATUS_LABEL } from "@/domain/labels";
 import { latestQuote, viewerDamages, viewerItems } from "@/lib/claim-view";
 import { requirePageUser } from "@/lib/session";
@@ -57,8 +59,13 @@ export default async function WorkshopClaimPage({ params }: { params: Promise<{ 
                 <CardTitle className="text-base">Orçamento v{sent.version} · {QUOTE_STATUS_LABEL[sent.status]}</CardTitle>
                 <CardDescription>Prazo estimado: {sent.estimatedDays} dia(s).</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
                 <QuoteTable items={sent.items} />
+                <FinancialSummaryView
+                  summary={financialSummary(sent.items, claim.policy.deductible)}
+                  audience="staff"
+                  provisional={sent.items.some((i) => i.coverage === "PENDENTE")}
+                />
               </CardContent>
             </Card>
           ) : null}
